@@ -9,34 +9,15 @@ import (
 	"github.com/gorilla/mux"
 )
 
-func WriteJson(w http.ResponseWriter, status int, v any) error {
-	w.WriteHeader(status)
-	w.Header().Set("Content-Type", "application/json")
-	return json.NewEncoder(w).Encode(v)
-}
-
-type apiFunc func(http.ResponseWriter, *http.Request) error
-
-type ApiError struct {
-	Error string
-}
-
-func makeHttpHandleFunc(f apiFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if err := f(w, r); err != nil {
-			//Handle the error
-			WriteJson(w, http.StatusBadRequest, ApiError{Error: err.Error()})
-		}
-	}
-}
-
 type ApiServer struct {
 	listenAddress string
+	store         Storage
 }
 
-func NewApiServer(listenAddress string) *ApiServer {
+func NewApiServer(listenAddress string, store Storage) *ApiServer {
 	return &ApiServer{
 		listenAddress: listenAddress,
+		store:         store,
 	}
 }
 
@@ -74,7 +55,17 @@ func (s *ApiServer) handleGetAccount(w http.ResponseWriter, r *http.Request) err
 }
 
 func (s *ApiServer) handleCreateAccount(w http.ResponseWriter, r *http.Request) error {
-	return nil
+	createAccountReq := CreateAccountRequest{}
+	if err := json.NewDecoder(r.Body).Decode(&createAccountReq); err != nil {
+		return err
+	}
+
+	account := newAccount(createAccountReq.FirstName, createAccountReq.LastName)
+	if err := s.store.CreateAccount(account); err != nil {
+		return err
+	}
+
+	return WriteJson(w, http.StatusOK, account)
 }
 
 func (s *ApiServer) handleDeleteAccount(w http.ResponseWriter, r *http.Request) error {
@@ -83,4 +74,25 @@ func (s *ApiServer) handleDeleteAccount(w http.ResponseWriter, r *http.Request) 
 
 func (s *ApiServer) handleTransfer(w http.ResponseWriter, r *http.Request) error {
 	return nil
+}
+
+func WriteJson(w http.ResponseWriter, status int, v any) error {
+	w.Header().Add("Content-Type", "application/json")
+	w.WriteHeader(status)
+	return json.NewEncoder(w).Encode(v)
+}
+
+type apiFunc func(http.ResponseWriter, *http.Request) error
+
+type ApiError struct {
+	Error string
+}
+
+func makeHttpHandleFunc(f apiFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if err := f(w, r); err != nil {
+			//Handle the error
+			WriteJson(w, http.StatusBadRequest, ApiError{Error: err.Error()})
+		}
+	}
 }
