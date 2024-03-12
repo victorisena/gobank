@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 
+	jwt "github.com/golang-jwt/jwt/v4"
 	"github.com/gorilla/mux"
 )
 
@@ -26,7 +27,7 @@ func (s *ApiServer) Run() {
 	router := mux.NewRouter()
 
 	router.HandleFunc("/account", makeHttpHandleFunc(s.handleAccount))
-	router.HandleFunc("/account/{id}", makeHttpHandleFunc(s.handleGetAccountById))
+	router.HandleFunc("/account/{id}", withJWTAuth(makeHttpHandleFunc(s.handleGetAccountById)))
 	router.HandleFunc("/transfer", makeHttpHandleFunc(s.handleTransfer))
 
 	log.Println("JSON API server running on port:", s.listenAddress)
@@ -117,6 +118,16 @@ func WriteJson(w http.ResponseWriter, status int, v any) error {
 	w.Header().Add("Content-Type", "application/json")
 	w.WriteHeader(status)
 	return json.NewEncoder(w).Encode(v)
+}
+
+func withJWTAuth(handlerFunc http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		handlerFunc(w, r)
+	}
+}
+
+func validateJWT(token string) (*jwt.Token, error) {
+	return nil, nil
 }
 
 type apiFunc func(http.ResponseWriter, *http.Request) error
